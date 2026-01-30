@@ -3,8 +3,11 @@ import 'package:belfort/pages/google_login_page.dart';
 import 'package:belfort/pages/my_homepage.dart';
 
 import 'package:belfort/data/datasource/reactions_remote_ds.dart';
+import 'package:belfort/data/datasource/weekly_tasks_remote_ds.dart';
 import 'package:belfort/data/repositories/reactions_repository.dart';
+import 'package:belfort/data/repositories/weekly_tasks_repository.dart';
 import 'package:belfort/bloc/save_reaction_bloc.dart';
+import 'package:belfort/bloc/weekly_tasks_bloc.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -17,20 +20,35 @@ Future<void> main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   final firestore = FirebaseFirestore.instance;
-  final remote = ReactionsRemoteDataSource(firestore);
-  final repo = ReactionsRepository(remote);
 
-  runApp(AppRoot(repo: repo));
+  final reactionsRemote = ReactionsRemoteDataSource(firestore);
+  final reactionsRepo = ReactionsRepository(reactionsRemote);
+
+  final weeklyTasksRemote = WeeklyTasksRemoteDataSource(firestore);
+  final weeklyTasksRepo = WeeklyTasksRepository(weeklyTasksRemote);
+
+  runApp(
+    AppRoot(reactionsRepo: reactionsRepo, weeklyTasksRepo: weeklyTasksRepo),
+  );
 }
 
 class AppRoot extends StatelessWidget {
-  const AppRoot({super.key, required this.repo});
-  final ReactionsRepository repo;
+  const AppRoot({
+    super.key,
+    required this.reactionsRepo,
+    required this.weeklyTasksRepo,
+  });
+
+  final ReactionsRepository reactionsRepo;
+  final WeeklyTasksRepository weeklyTasksRepo;
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => SaveReactionBloc(repo: repo),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => SaveReactionBloc(repo: reactionsRepo)),
+        BlocProvider(create: (_) => WeeklyTasksBloc(repo: weeklyTasksRepo)),
+      ],
       child: const MyApp(),
     );
   }

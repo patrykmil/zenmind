@@ -9,6 +9,7 @@ import 'package:belfort/pages/my_profile.dart';
 import 'package:belfort/pages/statistics_page.dart';
 import 'package:belfort/services/firebase_auth_service.dart';
 import 'package:belfort/bloc/save_reaction_bloc.dart';
+import 'package:belfort/bloc/weekly_tasks_bloc.dart';
 import 'package:belfort/widgets/home/daily_fact_card.dart';
 import 'package:belfort/widgets/home/weekly_task_item.dart';
 import 'package:flutter/material.dart';
@@ -28,9 +29,10 @@ class _MyHomePageState extends State<MyHomePage>
     with SingleTickerProviderStateMixin {
   int _navIndex = 0;
   late final AnimationController _floatController;
-  late final List<WeeklyTask> _weeklyTasks;
 
   MoodOption? _selectedMood;
+
+  late final List<WeeklyTask> _weeklyTasks;
 
   @override
   void initState() {
@@ -42,37 +44,46 @@ class _MyHomePageState extends State<MyHomePage>
 
     _weeklyTasks = [
       WeeklyTask(
+        id: 'task_1',
         icon: Icons.self_improvement,
         title: '2-minute breathing',
         subtitle: 'Slow inhale and exhale for 2 minutes.',
       ),
       WeeklyTask(
+        id: 'task_2',
         icon: Icons.directions_walk,
         title: '10-minute walk',
         subtitle: 'Preferably outside or near greenery.',
       ),
       WeeklyTask(
+        id: 'task_3',
         icon: Icons.water_drop,
         title: 'Hydration check',
         subtitle: 'Drink a glass of water right now.',
       ),
       WeeklyTask(
+        id: 'task_4',
         icon: Icons.accessibility_new,
         title: 'Stretch break',
         subtitle: '3 minutes of gentle stretching.',
       ),
       WeeklyTask(
+        id: 'task_5',
         icon: Icons.edit_note,
         title: 'Gratitude note',
         subtitle: 'Write down 3 things you appreciate.',
       ),
     ];
-  }
 
-  @override
-  void dispose() {
-    _floatController.dispose();
-    super.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authService = FirebaseAuthService();
+      final userId = authService.currentUser?.uid;
+      if (userId != null && userId.isNotEmpty) {
+        context.read<WeeklyTasksBloc>().add(
+          WeeklyTasksLoadRequested(userId: userId),
+        );
+      }
+    });
   }
 
   String _dailyFunFact() {
@@ -165,77 +176,108 @@ class _MyHomePageState extends State<MyHomePage>
 
   Widget _buildWeeklyTasksCard(BuildContext context) {
     final theme = Theme.of(context);
-    final doneCount = _weeklyTasks.where((t) => t.isDone).length;
-    final total = _weeklyTasks.length;
+    final authService = FirebaseAuthService();
+    final userId = authService.currentUser?.uid ?? '';
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outline),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 16,
-            color: Colors.black.withValues(alpha: 0.05),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.greenPrimary.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.outline),
-                ),
-                child: const Icon(
-                  Icons.sentiment_satisfied_alt,
-                  color: AppColors.greenDark,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Tasks for this week',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: AppColors.text,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              Text(
-                '$doneCount/$total',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: AppColors.textMuted,
-                  fontWeight: FontWeight.w800,
-                ),
+    return BlocBuilder<WeeklyTasksBloc, WeeklyTasksState>(
+      builder: (context, state) {
+        final tasksWithStatus = _weeklyTasks.map((task) {
+          final isDone = state.taskStatus[task.id] ?? false;
+          return task.copyWith(isDone: isDone);
+        }).toList();
+
+        final doneCount = tasksWithStatus.where((t) => t.isDone).length;
+        final total = tasksWithStatus.length;
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.outline),
+            boxShadow: [
+              BoxShadow(
+                blurRadius: 16,
+                color: Colors.black.withValues(alpha: 0.05),
               ),
             ],
           ),
-
-          const SizedBox(height: 10),
-
-          ..._weeklyTasks.asMap().entries.map((entry) {
-            final index = entry.key;
-            final task = entry.value;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: WeeklyTaskItem(
-                task: task,
-                onToggle: (v) => setState(() => _weeklyTasks[index].isDone = v),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.greenPrimary.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.outline),
+                    ),
+                    child: const Icon(
+                      Icons.sentiment_satisfied_alt,
+                      color: AppColors.greenDark,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Tasks for this week',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: AppColors.text,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '$doneCount/$total',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: AppColors.textMuted,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
-            );
-          }).toList(),
-        ],
-      ),
+              const SizedBox(height: 10),
+              if (state.status == WeeklyTasksStatus.loading)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (state.status == WeeklyTasksStatus.failure)
+                Center(
+                  child: Text(
+                    state.errorMessage ?? 'Failed to load tasks',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                )
+              else
+                ...tasksWithStatus.map((task) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: WeeklyTaskItem(
+                      task: task,
+                      onToggle: (isDone) {
+                        context.read<WeeklyTasksBloc>().add(
+                          WeeklyTaskToggled(
+                            userId: userId,
+                            taskId: task.id,
+                            isDone: isDone,
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                }),
+            ],
+          ),
+        );
+      },
     );
   }
 
