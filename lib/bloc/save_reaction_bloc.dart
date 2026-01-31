@@ -5,15 +5,17 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/models/reaction_entry.dart';
 import '../../data/repositories/reactions_repository.dart';
+import '../../data/repositories/points_repository.dart';
 
 part 'save_reaction_event.dart';
 part 'save_reaction_state.dart';
 
 class SaveReactionBloc extends Bloc<SaveReactionEvent, SaveReactionState> {
   final ReactionsRepository repo;
+  final PointsRepository pointsRepo;
   final Uuid uuid;
 
-  SaveReactionBloc({required this.repo, Uuid? uuid})
+  SaveReactionBloc({required this.repo, required this.pointsRepo, Uuid? uuid})
     : uuid = uuid ?? const Uuid(),
       super(const SaveReactionState()) {
     on<ReactionSubmitPressed>(_onSubmit);
@@ -47,6 +49,8 @@ class SaveReactionBloc extends Bloc<SaveReactionEvent, SaveReactionState> {
       );
 
       await repo.createReaction(event.userId, entry);
+
+      await pointsRepo.awardDailyReactionPoints(event.userId);
 
       emit(state.copyWith(status: SaveReactionStatus.success));
       emit(state.copyWith(status: SaveReactionStatus.initial));

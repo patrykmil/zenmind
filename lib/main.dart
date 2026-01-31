@@ -4,10 +4,13 @@ import 'package:belfort/pages/my_homepage.dart';
 
 import 'package:belfort/data/datasource/reactions_remote_ds.dart';
 import 'package:belfort/data/datasource/weekly_tasks_remote_ds.dart';
+import 'package:belfort/data/datasource/points_remote_ds.dart';
 import 'package:belfort/data/repositories/reactions_repository.dart';
 import 'package:belfort/data/repositories/weekly_tasks_repository.dart';
+import 'package:belfort/data/repositories/points_repository.dart';
 import 'package:belfort/bloc/save_reaction_bloc.dart';
 import 'package:belfort/bloc/weekly_tasks_bloc.dart';
+import 'package:belfort/bloc/points_bloc.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -27,8 +30,15 @@ Future<void> main() async {
   final weeklyTasksRemote = WeeklyTasksRemoteDataSource(firestore);
   final weeklyTasksRepo = WeeklyTasksRepository(weeklyTasksRemote);
 
+  final pointsRemote = PointsRemoteDataSource(firestore);
+  final pointsRepo = PointsRepository(pointsRemote);
+
   runApp(
-    AppRoot(reactionsRepo: reactionsRepo, weeklyTasksRepo: weeklyTasksRepo),
+    AppRoot(
+      reactionsRepo: reactionsRepo,
+      weeklyTasksRepo: weeklyTasksRepo,
+      pointsRepo: pointsRepo,
+    ),
   );
 }
 
@@ -37,17 +47,26 @@ class AppRoot extends StatelessWidget {
     super.key,
     required this.reactionsRepo,
     required this.weeklyTasksRepo,
+    required this.pointsRepo,
   });
 
   final ReactionsRepository reactionsRepo;
   final WeeklyTasksRepository weeklyTasksRepo;
+  final PointsRepository pointsRepo;
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider(create: (_) => SaveReactionBloc(repo: reactionsRepo)),
-        BlocProvider(create: (_) => WeeklyTasksBloc(repo: weeklyTasksRepo)),
+        BlocProvider(
+          create: (_) =>
+              SaveReactionBloc(repo: reactionsRepo, pointsRepo: pointsRepo),
+        ),
+        BlocProvider(
+          create: (_) =>
+              WeeklyTasksBloc(repo: weeklyTasksRepo, pointsRepo: pointsRepo),
+        ),
+        BlocProvider(create: (_) => PointsBloc(repo: pointsRepo)),
       ],
       child: const MyApp(),
     );

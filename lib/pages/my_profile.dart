@@ -1,9 +1,9 @@
 import 'package:belfort/core/constants/app_colors.dart';
-import 'package:belfort/data/models/profile_stats.dart';
 import 'package:belfort/pages/google_login_page.dart';
 import 'package:belfort/services/firebase_auth_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:belfort/bloc/points_bloc.dart';
 
 class MyProfilePage extends StatelessWidget {
   final String userId;
@@ -65,110 +65,18 @@ class MyProfileView extends StatefulWidget {
 }
 
 class _MyProfileViewState extends State<MyProfileView> {
-  late Stream<ProfileStats> _statsStream;
-
   @override
   void initState() {
     super.initState();
-    _statsStream = _createStatsStream();
-  }
-
-  String _dateKey(DateTime dt) {
-    final y = dt.year.toString().padLeft(4, '0');
-    final m = dt.month.toString().padLeft(2, '0');
-    final d = dt.day.toString().padLeft(2, '0');
-    return '$y-$m-$d';
-  }
-
-  int _pointsForScore(int score) {
-    final s = score.clamp(1, 5);
-    return s * 10;
-  }
-
-  CollectionReference<Map<String, dynamic>> _reactionsCol() {
-    return FirebaseFirestore.instance
-        .collection('users')
-        .doc(widget.userId)
-        .collection('reactions');
-  }
-
-  Stream<ProfileStats> _createStatsStream() {
-    if (widget.userId.isEmpty) {
-      return Stream.value(ProfileStats.empty());
-    }
-
-    return _reactionsCol().snapshots().map((snapshot) {
-      final now = DateTime.now();
-      final todayKey = _dateKey(DateTime(now.year, now.month, now.day));
-
-      final total = snapshot.size;
-
-      final Set<String> daysWithReactions = <String>{};
-      int todayCount = 0;
-
-      int totalPoints = 0;
-      int todayPoints = 0;
-
-      for (final doc in snapshot.docs) {
-        final data = doc.data();
-
-        final createdAt = data['createdAt'];
-        if (createdAt != null) {
-          final dt = createdAt is Timestamp
-              ? createdAt.toDate()
-              : DateTime.fromMillisecondsSinceEpoch(createdAt as int);
-          final dateKey = _dateKey(DateTime(dt.year, dt.month, dt.day));
-          daysWithReactions.add(dateKey);
-
-          if (dateKey == todayKey) todayCount++;
-        }
-
-        final score = data['score'];
-        final scoreInt = (score is int) ? score : int.tryParse('$score');
-        if (scoreInt != null && createdAt != null) {
-          final pts = _pointsForScore(scoreInt);
-          totalPoints += pts;
-
-          final dt = createdAt is Timestamp
-              ? createdAt.toDate()
-              : DateTime.fromMillisecondsSinceEpoch(createdAt as int);
-          final dateKey = _dateKey(DateTime(dt.year, dt.month, dt.day));
-          if (dateKey == todayKey) todayPoints += pts;
-        }
-      }
-
-      int streak = 0;
-      const int maxLookbackDays = 60;
-
-      for (int i = 0; i < maxLookbackDays; i++) {
-        final day = DateTime(
-          now.year,
-          now.month,
-          now.day,
-        ).subtract(Duration(days: i));
-        final key = _dateKey(day);
-
-        if (daysWithReactions.contains(key)) {
-          streak++;
-        } else {
-          break;
-        }
-      }
-
-      return ProfileStats(
-        total: total,
-        today: todayCount,
-        streak: streak,
-        totalPoints: totalPoints,
-        todayPoints: todayPoints,
-      );
-    });
+    context.read<PointsBloc>().add(PointsHistoryChanged(userId: widget.userId));
   }
 
   Future<void> _refresh() async {
-    setState(() {
-      _statsStream = _createStatsStream();
-    });
+    if (mounted) {
+      context.read<PointsBloc>().add(
+        PointsHistoryChanged(userId: widget.userId),
+      );
+    }
     await Future<void>.delayed(const Duration(milliseconds: 120));
   }
 
@@ -202,7 +110,7 @@ class _MyProfileViewState extends State<MyProfileView> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Points scale',
+                        'How to earn points',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           color: AppColors.softTint,
                           fontWeight: FontWeight.w900,
@@ -217,16 +125,36 @@ class _MyProfileViewState extends State<MyProfileView> {
                   ],
                 ),
                 const SizedBox(height: 6),
-                _pointsRow('😞 Bad', '10 pts'),
-                _pointsRow('😕 Not great', '20 pts'),
-                _pointsRow('😐 Okay', '30 pts'),
-                _pointsRow('🙂 Good', '40 pts'),
-                _pointsRow('😄 Great', '50 pts'),
+                _pointsSectionTitle('Daily Activities'),
+                _pointsRow('Daily reaction', '5 pts'),
+                const SizedBox(height: 12),
+                _pointsSectionTitle('Streak Bonuses'),
+                _pointsRow('7-day streak', '20 pts'),
+                _pointsRow('14-day streak', '50 pts'),
+                _pointsRow('30-day streak', '100 pts'),
+                const SizedBox(height: 12),
+                _pointsSectionTitle('Weekly Tasks'),
+                _pointsRow('Each weekly task', '10 pts'),
+                _pointsRow('Complete all tasks', '40 pts'),
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _pointsSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, top: 4),
+      child: Text(
+        title,
+        style: TextStyle(
+          color: AppColors.greenPrimary.withValues(alpha: 0.85),
+          fontWeight: FontWeight.w800,
+          fontSize: 12,
+        ),
+      ),
     );
   }
 
@@ -327,7 +255,7 @@ class _MyProfileViewState extends State<MyProfileView> {
               ),
               onPressed: () => _showPointsInfo(context),
               child: const Text(
-                'See what you can get',
+                'See how to earn points',
                 style: TextStyle(fontWeight: FontWeight.w800),
               ),
             ),
@@ -424,13 +352,12 @@ class _MyProfileViewState extends State<MyProfileView> {
           ),
           const SizedBox(height: 18),
 
-          StreamBuilder<ProfileStats>(
-            stream: _statsStream,
-            builder: (context, snapshot) {
-              final isLoading =
-                  snapshot.connectionState == ConnectionState.waiting;
+          BlocBuilder<PointsBloc, PointsState>(
+            builder: (context, state) {
+              final profileStats = state.profileStats;
+              final isLoading = state.status == PointsStatus.loading;
 
-              if (snapshot.hasError) {
+              if (state.status == PointsStatus.failure) {
                 return _infoCard(
                   title: 'Stats unavailable',
                   subtitle: 'Pull to refresh or tap to retry',
@@ -439,12 +366,12 @@ class _MyProfileViewState extends State<MyProfileView> {
                 );
               }
 
-              final total = snapshot.data?.total ?? 0;
-              final today = snapshot.data?.today ?? 0;
-              final streak = snapshot.data?.streak ?? 0;
+              final total = profileStats?.total ?? 0;
+              final today = profileStats?.today ?? 0;
+              final streak = profileStats?.streak ?? 0;
 
-              final totalPoints = snapshot.data?.totalPoints ?? 0;
-              final todayPoints = snapshot.data?.todayPoints ?? 0;
+              final totalPoints = profileStats?.totalPoints ?? 0;
+              final todayPoints = profileStats?.todayPoints ?? 0;
 
               return Column(
                 children: [
@@ -483,46 +410,6 @@ class _MyProfileViewState extends State<MyProfileView> {
           ),
 
           const SizedBox(height: 18),
-
-          InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () {
-              if (widget.onGoToDashboard != null) {
-                widget.onGoToDashboard!();
-              } else {
-                Navigator.of(context).pop();
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF052E16),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.outline),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.dashboard, color: AppColors.softTint),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Go to Dashboard',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppColors.softTint,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    Icons.chevron_right,
-                    color: AppColors.softTint.withValues(alpha: 0.95),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 22),
 
           SizedBox(
             width: double.infinity,

@@ -12,4 +12,7 @@ class WeeklyTasksRepository {
 
   Future<void> markTaskIncomplete(String userId, String taskId) =>
       remote.markTaskIncomplete(userId, taskId);
+
+  Future<TaskCompletion?> getTaskCompletion(String userId, String taskId) =>
+      remote.getTaskCompletion(userId, taskId);
 }

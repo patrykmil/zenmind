@@ -8,7 +8,16 @@ BIP Mobile Programming 2026 Project - Public Copy
 
 1. Create Project in Firebase Console
 2. Create a Cloud Firestore database and add a collection named `users`.
-3. Enable the following providers in the Firebase Authentication section:
+3. Create needed indexes:
+   - **Manually in Firebase Console:**
+     - Collection ID: `pointsHistory`
+     - Fields: `reason` (Ascending), `createdAt` (Ascending)
+   - **Or via CLI:**
+     ```sh
+     firebase deploy --only firestore:indexes
+     ```
+
+4. Enable the following providers in the Firebase Authentication section:
    - Google
    - Email/Password
 

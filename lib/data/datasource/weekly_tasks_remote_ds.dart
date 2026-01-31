@@ -79,4 +79,22 @@ class WeeklyTasksRemoteDataSource {
         .doc(taskId)
         .delete();
   }
+
+  Future<TaskCompletion?> getTaskCompletion(
+    String userId,
+    String taskId,
+  ) async {
+    final doc = await firestore
+        .collection('users')
+        .doc(userId)
+        .collection('taskCompletions')
+        .doc(taskId)
+        .get();
+
+    if (!doc.exists) {
+      return null;
+    }
+
+    return TaskCompletion.fromMap(doc.data()!);
+  }
 }
