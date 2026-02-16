@@ -1,6 +1,7 @@
 # ZenMind
 
 BIP Mobile Programming 2026 Project - Public Copy
+Mindfulness app with mood tracking, daily tips and tasks and a points system.
 
 ## Setup
 
@@ -33,3 +34,22 @@ Run the command in terminal to retrieve SHA fingerprints:
 ```bash
 keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android
 ```
+
+## Screenshots
+
+**Login:**
+
+![Login](screenshots/login.png)
+
+**Homepage:**
+
+![Homepage1](screenshots/homepage1.png)
+![Homepage2](screenshots/homepage2.png)
+
+**Dashboard:**
+
+![Dashboard](screenshots/dashboard.png)
+
+**Profile:**
+
+![Profile](screenshots/profile.png)
